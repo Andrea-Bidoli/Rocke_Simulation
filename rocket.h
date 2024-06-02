@@ -93,9 +93,13 @@ class Tank: public cylinder{
     };
 
 class Engine: public cylinder{
+    private:
+        double max_angle = 15 * (M_PI/180);
     public:
         double max_thrust, thrust;
         double throttle = 0;
+        double pitch, yaw;
+        vec3<double> thrust_vector;
         Engine(double diameter, double height, double max_thrust, double mass=-1): cylinder(diameter, height, mass){
             this->max_thrust = max_thrust;
             this->thrust = this->max_thrust*this->throttle;
@@ -103,6 +107,21 @@ class Engine: public cylinder{
         void set_throttle(double throttle){
             this->thrust = this->max_thrust*throttle;
             this->throttle = throttle;
+        }
+        void set_pitch(double pitch){
+            this->pitch = pitch;
+        }
+        void set_yaw(double yaw){
+            this->yaw = yaw;
+        }
+        void calc_thrust_vector(){
+            double theta, phi;
+            theta = atan2(pitch, yaw);
+            phi = sqrt(pow(pitch, 2) + pow(yaw, 2))*max_angle;
+
+            thrust_vector.x = thrust*sin(phi)*cos(theta);
+            thrust_vector.y = thrust*sin(phi)*sin(theta);
+            thrust_vector.z = thrust*cos(phi);
         }
     };
 
@@ -113,9 +132,9 @@ class fin: public part{
         double span;
         double mean_chord;
         double taper, area;
-        fin(double span, double mean_chord, double taper, double mass=-1): part(mean_chord, span, mass){
+        fin(double span, double average_chord, double taper, double mass=-1): part(average_chord, span, mass){
             this->span = span;
-            this->mean_chord = mean_chord;
+            this->mean_chord = average_chord;
             this->taper = taper;
             this->root_chord = 2*mean_chord/(1 + this->taper);
             this->tip_chord = this->taper*this->root_chord;
@@ -168,14 +187,13 @@ class Rocket{
                 y = y/tot_mass;
                 z = z/tot_mass;
                 // I_tot
-                // I2 = I1 + m*d^2
-                // FIXME: I_tot is wrong
-                double dist_x = abs(i.first->CG.x - x);
-                double dist_y = abs(i.first->CG.y - y);
-                double dist_z = abs(i.first->CG.z - z);
-                I_tot.x = I_tot.x + i.first->I.x + i.first->mass*pow(dist_x, 2);
-                I_tot.y = I_tot.y + i.first->I.y + i.first->mass*pow(dist_y, 2);
-                I_tot.z = I_tot.z + i.first->I.z + i.first->mass*pow(dist_z, 2);
+                double dist_xy_plane = pow(abs(i.first->CG.x - x), 2) + pow(abs(i.first->CG.y - y), 2);
+                double dist_xz_plane = pow(abs(i.first->CG.x - x), 2) + pow(abs(i.first->CG.z - z), 2);
+                double dist_yz_plane = pow(abs(i.first->CG.y - y), 2) + pow(abs(i.first->CG.z - z), 2);
+
+                I_tot.x = I_tot.x + i.first->I.x + i.first->mass*pow(dist_yz_plane, 2);
+                I_tot.y = I_tot.y + i.first->I.y + i.first->mass*pow(dist_xz_plane, 2);
+                I_tot.z = I_tot.z + i.first->I.z + i.first->mass*pow(dist_xy_plane, 2);
             }
             CG_tot.x = x;
             CG_tot.y = y;
